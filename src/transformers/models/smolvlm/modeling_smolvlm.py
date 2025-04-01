@@ -84,16 +84,11 @@ class SmolVLMPreTrainedModel(PreTrainedModel):
     _supports_cache_class = True
 
     def _init_weights(self, module):
-        std = (
-            self.config.text_config.initializer_range
-            if hasattr(self.config, "initializer_range")
-            else self.config.text_config.initializer_range
-        )
-
-        if hasattr(module, "class_embedding"):
-            module.class_embedding.data.normal_(mean=0.0, std=std)
-
-        if isinstance(module, (nn.Linear, nn.Conv2d)):
+        std = self.config.text_config.initializer_range
+        text_model_module = self.text_model if hasattr(self, "text_model") else self.model.text_model
+        if module in text_model_module.modules():
+            text_model_module._init_weights(module)
+        elif isinstance(module, (nn.Linear, nn.Conv2d)):
             module.weight.data.normal_(mean=0.0, std=std)
             if module.bias is not None:
                 module.bias.data.zero_()
@@ -101,6 +96,9 @@ class SmolVLMPreTrainedModel(PreTrainedModel):
             module.weight.data.normal_(mean=0.0, std=std)
             if module.padding_idx is not None:
                 module.weight.data[module.padding_idx].zero_()
+        elif isinstance(module, nn.LayerNorm):
+            module.weight.data.fill_(1.0)
+            module.bias.data.zero_()
 
 
 class SmolVLMVisionEmbeddings(nn.Module):
